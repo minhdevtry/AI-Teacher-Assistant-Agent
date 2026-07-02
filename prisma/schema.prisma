@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  Id          Int      @id @default(autoincrement())
+  Name        String   @db.VarChar(128)
+  Code        String   @unique @db.VarChar(24)
+  Description String?  @db.VarChar(512)
+  CreatedAt   DateTime @default(now())
+  ModifiedAt  DateTime @default(now()) @updatedAt
+  IsActive    Int      @default(1)
+
+  Role       String   @db.VarChar(16)
+  Phone      String?  @db.VarChar(20)
+  ZaloUserId String?  @db.VarChar(64)
+  ParentId   Int?
+  ClassCode  String?  @db.VarChar(24)
+  Nickname   String?  @db.VarChar(64)
+  Title      String?  @db.VarChar(32)
+  Tone       String?  @db.VarChar(32)
+  Timezone   String   @default("Asia/Ho_Chi_Minh") @db.VarChar(32)
+
+  @@map("User")
+}
+
+model Class {
+  Id          Int      @id @default(autoincrement())
+  Name        String   @db.VarChar(128)
+  Code        String   @unique @db.VarChar(24)
+  Description String?  @db.VarChar(512)
+  CreatedAt   DateTime @default(now())
+  ModifiedAt  DateTime @default(now()) @updatedAt
+  IsActive    Int      @default(1)
+
+  TeacherCode String  @db.VarChar(24)
+  Subject     String  @db.VarChar(64)
+  FeeAmount   Int
+  FeeType     String  @db.VarChar(16)
+  Schedule    String? @db.VarChar(256)
+  Status      String  @default("active") @db.VarChar(16)
+
+  @@map("Class")
+}
+
+model Invoice {
+  Id              Int       @id @default(autoincrement())
+  Name            String    @db.VarChar(128)
+  Code            String    @unique @db.VarChar(24)
+  Description     String?   @db.VarChar(512)
+  CreatedAt       DateTime  @default(now())
+  ModifiedAt      DateTime  @default(now()) @updatedAt
+  IsActive        Int       @default(1)
+
+  StudentCode     String    @db.VarChar(24)
+  ClassCode       String    @db.VarChar(24)
+  BillingMonth    String    @db.VarChar(7)
+  Status          String    @default("unpaid") @db.VarChar(16)
+  TotalAmount     Int
+  PaidAmount      Int       @default(0)
+  RemainingAmount Int
+  DueDate         DateTime?
+  Note            String?   @db.VarChar(512)
+
+  @@map("Invoice")
+}
+
+model Payment {
+  Id              Int       @id @default(autoincrement())
+  Name            String    @db.VarChar(128)
+  Code            String    @unique @db.VarChar(24)
+  Description     String?   @db.VarChar(512)
+  CreatedAt       DateTime  @default(now())
+  ModifiedAt      DateTime  @default(now()) @updatedAt
+  IsActive        Int       @default(1)
+
+  StudentCode     String    @db.VarChar(24)
+  InvoiceCode     String    @db.VarChar(24)
+  TeacherCode     String    @db.VarChar(24)
+  Amount          Int
+  Method          String    @db.VarChar(16)
+  PaidAt          DateTime?
+  Status          String    @default("draft") @db.VarChar(16)
+  CreatedFrom     String    @default("manual") @db.VarChar(16)
+  FileUrl         String?   @db.VarChar(512)
+  FileType        String?   @db.VarChar(16)
+  ExtractedAmount Int?
+  ExtractedNote   String?   @db.VarChar(256)
+  ExtractedBank   String?   @db.VarChar(64)
+  ExtractedTime   DateTime?
+  RawAiResult     String?   @db.Text
+  ConfidenceScore Decimal?  @db.Decimal(5, 2)
+
+  @@map("Payment")
+}
+
+model ChannelEvent {
+  Id              Int       @id @default(autoincrement())
+  Name            String    @db.VarChar(128)
+  Code            String    @unique @db.VarChar(24)
+  Description     String?   @db.VarChar(512)
+  CreatedAt       DateTime  @default(now())
+  ModifiedAt      DateTime  @default(now()) @updatedAt
+  IsActive        Int       @default(1)
+
+  Platform        String    @db.VarChar(16)
+  SenderId        String    @db.VarChar(64)
+  SenderName      String?   @db.VarChar(128)
+  EventType       String    @db.VarChar(32)
+  Content         String?   @db.VarChar(2000)
+  MediaUrl        String?   @db.VarChar(512)
+  RawPayload      String?   @db.Text
+  Intent          String?   @db.VarChar(32)
+  WorkflowRunId   String?   @db.VarChar(64)
+  ApprovalStatus  String    @default("none") @db.VarChar(16)
+  ApprovalSummary String?   @db.VarChar(1000)
+  ApprovalPayload String?   @db.Text
+  ApprovalAction  String?   @db.VarChar(32)
+  ApprovedAt      DateTime?
+  ExpiresAt       DateTime?
+  ResultText      String?   @db.VarChar(2000)
+  SheetSynced     Int       @default(0)
+
+  @@map("ChannelEvent")
+}
+
+model MonthlyClosing {
+  Id               Int      @id @default(autoincrement())
+  Name             String   @db.VarChar(128)
+  Code             String   @unique @db.VarChar(24)
+  Description      String?  @db.VarChar(512)
+  CreatedAt        DateTime @default(now())
+  ModifiedAt       DateTime @default(now()) @updatedAt
+  IsActive         Int      @default(1)
+
+  ClassCode        String  @db.VarChar(24)
+  TeacherCode      String  @db.VarChar(24)
+  BillingMonth     String  @db.VarChar(7)
+  TotalStudents    Int
+  ExpectedRevenue  Int
+  CollectedRevenue Int
+  OutstandingDebt  Int
+  Overpayment      Int     @default(0)
+  Status           String  @default("draft") @db.VarChar(16)
+  ReportJson       String? @db.Text
+
+  @@map("MonthlyClosing")
+}
+
+model AuditLog {
+  Id          Int      @id @default(autoincrement())
+  Name        String   @db.VarChar(128)
+  Code        String   @unique @db.VarChar(24)
+  Description String?  @db.VarChar(512)
+  CreatedAt   DateTime @default(now())
+  ModifiedAt  DateTime @default(now()) @updatedAt
+  IsActive    Int      @default(1)
+
+  TeacherCode String? @db.VarChar(24)
+  EntityType  String  @db.VarChar(32)
+  EntityCode  String  @db.VarChar(24)
+  Action      String  @db.VarChar(32)
+  OldValue    String? @db.Text
+  NewValue    String? @db.Text
+  ActorType   String  @db.VarChar(16)
+  ActorDetail String? @db.VarChar(64)
+
+  @@map("AuditLog")
+}
