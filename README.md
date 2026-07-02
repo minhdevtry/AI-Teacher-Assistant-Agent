@@ -48,7 +48,7 @@ ZaloAgent là hệ thống backend AI-first cho giáo viên tư thục Việt Na
 
 ## ⚙️ Kiến Trúc
 
-\\\
+```
 Zalo → ChannelAdapter → AgentRouterService → Mastra Agents
                                               ├── Workflow (suspend/resume)
                                               │   ├── recordPaymentText
@@ -56,7 +56,7 @@ Zalo → ChannelAdapter → AgentRouterService → Mastra Agents
                                               │   ├── feeQuestionAnswer
                                               │   └── generateReminder
                                               └── BullMQ → Google Sheets
-\\\
+```
 
 **Design Patterns:** Channel Adapter · Human-in-the-loop Approval · Thread-based Memory · BullMQ Job Queue · Soft Delete + Audit Trail
 
@@ -66,7 +66,7 @@ User · Class · Invoice · Payment · ChannelEvent · MonthlyClosing · AuditLo
 
 ## 📁 Cấu Trúc Source
 
-\\\
+```
 src/
 ├── channels/zalo/         Zalo webhook + channel adapter
 ├── domain/                CRUD: users, classes, invoices, payments, reports
@@ -78,24 +78,24 @@ src/
 │   ├── workflows/        4 suspend/resume workflows
 │   └── agent-router.service.ts
 └── core/                  Config, health, filters
-\\\
+```
 
 ## 🧪 Testing
 
-\\\ash
+```bash
 npm run test          # Unit tests (Jest)
 npm run test:e2e      # End-to-end (Supertest)
 npm run test:cov      # Coverage report
-\\\
+```
 
 ## 🚀 Getting Started
 
-\\\ash
+```bash
 npm install
 npx prisma migrate dev
 npx prisma db seed
 npm run start:dev
-\\\
+```
 
 ---
 
