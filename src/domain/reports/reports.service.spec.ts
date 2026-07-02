@@ -83,7 +83,7 @@ describe('ReportsService', () => {
       jest.spyOn(service as any, 'getCurrentMonth').mockReturnValue('2026-07');
       jest.spyOn(service as any, 'getPreviousMonth').mockReturnValue('2026-06');
 
-      classesService.findAll.mockResolvedValue({ data: [], total: 5 } as any);
+      classesService.findAll.mockResolvedValue({ data: [{ Code: 'CLS001' }], total: 5 } as any);
 
       // We have two calls to mockClient.from
       // First call: count total students
@@ -95,7 +95,7 @@ describe('ReportsService', () => {
       ]);
       // Third call: get previous month closings (to compare)
       const prevClosingBuilder = new MockBuilder([
-        { ExpectedRevenue: 2500, CollectedRevenue: 2000, OutstandingDebt: 500 },
+        { ClassCode: 'CLS001', ExpectedRevenue: 2500, CollectedRevenue: 2000, OutstandingDebt: 500 },
       ]);
 
       mockClient.from.mockImplementation((table: string) => {
@@ -127,11 +127,11 @@ describe('ReportsService', () => {
       jest.spyOn(service as any, 'getCurrentMonth').mockReturnValue('2026-07');
       jest.spyOn(service as any, 'getPreviousMonth').mockReturnValue('2026-05');
 
-      classesService.findAll.mockResolvedValue({ data: [], total: 3 } as any);
+      classesService.findAll.mockResolvedValue({ data: [{ Code: 'CLS001' }], total: 3 } as any);
 
       const studentBuilder = new MockBuilder(null, null, 10);
       const targetClosingBuilder = new MockBuilder([
-        { ExpectedRevenue: 4000, CollectedRevenue: 3500, OutstandingDebt: 500 },
+        { ClassCode: 'CLS001', ExpectedRevenue: 4000, CollectedRevenue: 3500, OutstandingDebt: 500 },
       ]);
       const prevClosingBuilder = new MockBuilder([]);
       const prevInvoiceBuilder = new MockBuilder([

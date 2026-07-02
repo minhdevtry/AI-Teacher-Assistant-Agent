@@ -54,3 +54,13 @@ We have addressed the reviewer's findings:
 - **Unit Test Updates and Verification**:
   - Enhanced mock setups in `reports.service.spec.ts` for `getRevenueTrends` to mock and verify correct aggregation logic.
   - Verified that all 29 unit tests pass successfully.
+
+## Task 4 Code Review Final Fixes (Expected Revenue & Dashboard Unification)
+- **Standardized Expected Revenue Calculation**:
+  - In [monthly-closing.service.ts](file:///c:/Users/vanto/Documents/VibeCoding/ZaloAgent/src/domain/monthly-closing/monthly-closing.service.ts), changed `expectedRevenue` in `createOrUpdateDraft` to be the sum of `TotalAmount` from the month's invoices instead of `studentCount * classData.FeeAmount`.
+  - In [reports.service.ts](file:///c:/Users/vanto/Documents/VibeCoding/ZaloAgent/src/domain/reports/reports.service.ts) (in `getClassMonthlyReport`), also updated `expectedRevenue` calculation to sum the `TotalAmount` from the month's invoices for consistency.
+- **Unified Historical Dashboard Aggregation**:
+  - In [reports.service.ts](file:///c:/Users/vanto/Documents/VibeCoding/ZaloAgent/src/domain/reports/reports.service.ts) (in `getDashboardSummary`), unified the logic for historical and previous months. For each active class, it checks for a finalized `MonthlyClosing` and adds its values. If none exists, it queries the invoices for that class dynamically. This correctly integrates unclosed or draft classes in historical totals.
+- **Unit Test Success**:
+  - Updated mock configurations in [reports.service.spec.ts](file:///c:/Users/vanto/Documents/VibeCoding/ZaloAgent/src/domain/reports/reports.service.spec.ts) to populate `activeClasses` and `ClassCode` in closing record mocks to align with the new unified loops.
+  - Verified all 37 tests in the workspace pass successfully.

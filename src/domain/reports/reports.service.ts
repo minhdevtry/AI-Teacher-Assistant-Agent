@@ -78,7 +78,7 @@ export class ReportsService {
       // Read historical snapshot from MonthlyClosing table
       const { data: closings, error: closeError } = await client
         .from('MonthlyClosing')
-        .select('ExpectedRevenue, CollectedRevenue, OutstandingDebt')
+        .select('ClassCode, ExpectedRevenue, CollectedRevenue, OutstandingDebt')
         .eq('BillingMonth', activeMonth)
         .eq('Status', 'finalized')
         .eq('IsActive', 1);
@@ -88,25 +88,34 @@ export class ReportsService {
         throw new InternalServerErrorException('Failed to query historical monthly closing');
       }
 
+      const finalizedMap = new Map<string, any>();
       (closings || []).forEach(close => {
-        expectedRevenue += close.ExpectedRevenue;
-        collectedRevenue += close.CollectedRevenue;
-        outstandingDebt += close.OutstandingDebt;
+        finalizedMap.set(close.ClassCode, close);
       });
 
-      // Fallback to dynamic if no closed data exists
-      if ((closings || []).length === 0) {
-        const { data: invoices, error: invError } = await client
-          .from('Invoice')
-          .select('TotalAmount, PaidAmount, RemainingAmount')
-          .eq('BillingMonth', activeMonth)
-          .eq('IsActive', 1);
+      for (const cls of activeClasses) {
+        const close = finalizedMap.get(cls.Code);
+        if (close) {
+          expectedRevenue += close.ExpectedRevenue || 0;
+          collectedRevenue += close.CollectedRevenue || 0;
+          outstandingDebt += close.OutstandingDebt || 0;
+        } else {
+          const { data: invoices, error: invError } = await client
+            .from('Invoice')
+            .select('TotalAmount, PaidAmount, RemainingAmount')
+            .eq('ClassCode', cls.Code)
+            .eq('BillingMonth', activeMonth)
+            .eq('IsActive', 1);
 
-        if (!invError) {
+          if (invError) {
+            this.logger.error(`Failed to calculate invoices for class ${cls.Code} in month ${activeMonth}: ${invError.message}`);
+            throw new InternalServerErrorException(`Failed to calculate invoices for class ${cls.Code}`);
+          }
+
           (invoices || []).forEach(inv => {
-            expectedRevenue += inv.TotalAmount;
-            collectedRevenue += inv.PaidAmount;
-            outstandingDebt += inv.RemainingAmount;
+            expectedRevenue += inv.TotalAmount || 0;
+            collectedRevenue += inv.PaidAmount || 0;
+            outstandingDebt += inv.RemainingAmount || 0;
           });
         }
       }
@@ -124,8 +133,9 @@ export class ReportsService {
 
     const { data: prevClosings, error: prevCloseErr } = await client
       .from('MonthlyClosing')
-      .select('ExpectedRevenue, CollectedRevenue, OutstandingDebt')
+      .select('ClassCode, ExpectedRevenue, CollectedRevenue, OutstandingDebt')
       .eq('BillingMonth', prevMonth)
+      .eq('Status', 'finalized')
       .eq('IsActive', 1);
 
     if (prevCloseErr) {
@@ -133,29 +143,36 @@ export class ReportsService {
       throw new InternalServerErrorException('Failed to query previous month closings');
     }
 
+    const prevFinalizedMap = new Map<string, any>();
     (prevClosings || []).forEach(close => {
-      prevExpected += close.ExpectedRevenue;
-      prevCollected += close.CollectedRevenue;
-      prevDebt += close.OutstandingDebt;
+      prevFinalizedMap.set(close.ClassCode, close);
     });
 
-    if ((prevClosings || []).length === 0) {
-      const { data: prevInvoices, error: prevInvErr } = await client
-        .from('Invoice')
-        .select('TotalAmount, PaidAmount, RemainingAmount')
-        .eq('BillingMonth', prevMonth)
-        .eq('IsActive', 1);
+    for (const cls of activeClasses) {
+      const close = prevFinalizedMap.get(cls.Code);
+      if (close) {
+        prevExpected += close.ExpectedRevenue || 0;
+        prevCollected += close.CollectedRevenue || 0;
+        prevDebt += close.OutstandingDebt || 0;
+      } else {
+        const { data: invoices, error: invError } = await client
+          .from('Invoice')
+          .select('TotalAmount, PaidAmount, RemainingAmount')
+          .eq('ClassCode', cls.Code)
+          .eq('BillingMonth', prevMonth)
+          .eq('IsActive', 1);
 
-      if (prevInvErr) {
-        this.logger.error(`Failed to query previous month invoices: ${prevInvErr.message}`);
-        throw new InternalServerErrorException('Failed to query previous month invoices');
+        if (invError) {
+          this.logger.error(`Failed to calculate invoices for class ${cls.Code} in month ${prevMonth}: ${invError.message}`);
+          throw new InternalServerErrorException(`Failed to calculate invoices for class ${cls.Code}`);
+        }
+
+        (invoices || []).forEach(inv => {
+          prevExpected += inv.TotalAmount || 0;
+          prevCollected += inv.PaidAmount || 0;
+          prevDebt += inv.RemainingAmount || 0;
+        });
       }
-
-      (prevInvoices || []).forEach(inv => {
-        prevExpected += inv.TotalAmount;
-        prevCollected += inv.PaidAmount;
-        prevDebt += inv.RemainingAmount;
-      });
     }
 
     const calcGrowth = (curr: number, prev: number) => {
@@ -499,7 +516,7 @@ export class ReportsService {
     });
 
     const invoices = invoicesResult.data;
-    const expectedRevenue = studentCount * classData.FeeAmount;
+    const expectedRevenue = invoices.reduce((sum: number, inv: any) => sum + (inv.TotalAmount || 0), 0);
     const collectedRevenue = invoices.reduce((sum: number, inv: any) => sum + (inv.PaidAmount || 0), 0);
     const outstandingDebt = invoices.reduce((sum: number, inv: any) => sum + (inv.RemainingAmount || 0), 0);
 

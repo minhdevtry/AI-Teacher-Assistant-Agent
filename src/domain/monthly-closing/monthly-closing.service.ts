@@ -82,7 +82,7 @@ export class MonthlyClosingService {
     });
     const invoices = invoicesResult.data;
 
-    const expectedRevenue = studentCount * classData.FeeAmount;
+    const expectedRevenue = invoices.reduce((sum: number, inv: any) => sum + (inv.TotalAmount || 0), 0);
     const collectedRevenue = invoices.reduce((sum: number, inv: any) => sum + (inv.PaidAmount || 0), 0);
     const outstandingDebt = invoices.reduce((sum: number, inv: any) => sum + (inv.RemainingAmount || 0), 0);
 
