@@ -176,47 +176,30 @@ describe('ReportsService', () => {
       ];
 
       const classBuilder = new MockBuilder(mockClasses);
-      const closingBuilder1 = new MockBuilder({
-        Status: 'finalized',
-        TotalStudents: 10,
-        ExpectedRevenue: 5000000,
-        CollectedRevenue: 4500000,
-        OutstandingDebt: 500000,
-      });
-      const closingBuilder2 = new MockBuilder(null); // no closing snapshot
+      const studentBuilder = new MockBuilder([
+        { ClassCode: 'CLS002' },
+        { ClassCode: 'CLS002' },
+      ]);
+      const closingBuilder = new MockBuilder([
+        {
+          ClassCode: 'CLS001',
+          Status: 'finalized',
+          TotalStudents: 10,
+          ExpectedRevenue: 5000000,
+          CollectedRevenue: 4500000,
+          OutstandingDebt: 500000,
+        }
+      ]);
       const invoiceBuilder = new MockBuilder([
-        { TotalAmount: 400000, PaidAmount: 200000, RemainingAmount: 200000 },
+        { ClassCode: 'CLS002', TotalAmount: 400000, PaidAmount: 200000, RemainingAmount: 200000 },
       ]);
 
       mockClient.from.mockImplementation((table: string) => {
         if (table === 'Class') return classBuilder;
-        if (table === 'MonthlyClosing') {
-          // CLS001 returns closing, CLS002 returns null
-          // Since mockClient.from is called with 'MonthlyClosing' multiple times
-          return {
-            select: () => ({
-              eq: (field: string, val: string) => ({
-                eq: () => ({
-                  eq: () => ({
-                    maybeSingle: () => {
-                      if (val === 'CLS001') {
-                        return Promise.resolve({ data: { Status: 'finalized', TotalStudents: 10, ExpectedRevenue: 5000000, CollectedRevenue: 4500000, OutstandingDebt: 500000 }, error: null });
-                      }
-                      return Promise.resolve({ data: null, error: null });
-                    }
-                  })
-                })
-              })
-            })
-          };
-        }
+        if (table === 'User') return studentBuilder;
+        if (table === 'MonthlyClosing') return closingBuilder;
         if (table === 'Invoice') return invoiceBuilder;
         return new MockBuilder();
-      });
-
-      classesService.getStudentCount.mockImplementation(async (code) => {
-        if (code === 'CLS001') return 10;
-        return 2;
       });
 
       const financials = await service.getClassFinancials('2026-07');
@@ -273,8 +256,8 @@ describe('ReportsService', () => {
       ];
 
       const invoiceBuilder = new MockBuilder(invoices);
-      const studentBuilder = new MockBuilder({ Name: 'Student A', Nickname: 'A', Phone: '123' });
-      const classBuilder = new MockBuilder({ Name: 'Class A' });
+      const studentBuilder = new MockBuilder([{ Code: 'STD001', Name: 'Student A', Nickname: 'A', Phone: '123' }]);
+      const classBuilder = new MockBuilder([{ Code: 'CLS001', Name: 'Class A' }]);
 
       mockClient.from.mockImplementation((table: string) => {
         if (table === 'Invoice') return invoiceBuilder;
@@ -335,7 +318,7 @@ describe('ReportsService', () => {
       const closingBuilder = new MockBuilder(null);
       mockClient.from.mockImplementation((table: string) => {
         if (table === 'MonthlyClosing') return closingBuilder;
-        if (table === 'User') return new MockBuilder({ Name: 'Student X', Nickname: 'X' });
+        if (table === 'User') return new MockBuilder([{ Code: 'STD001', Name: 'Student X', Nickname: 'X' }, { Code: 'STD002', Name: 'Student X', Nickname: 'X' }]);
         return new MockBuilder();
       });
 

@@ -1,4 +1,4 @@
-import { Injectable, Logger, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
 import { SupabaseService } from '../../integrations/supabase/supabase.service';
 import { ClassesService } from '../classes/classes.service';
 import { InvoicesService } from '../invoices/invoices.service';
@@ -113,11 +113,16 @@ export class ReportsService {
     let prevCollected = 0;
     let prevDebt = 0;
 
-    const { data: prevClosings } = await client
+    const { data: prevClosings, error: prevCloseErr } = await client
       .from('MonthlyClosing')
       .select('ExpectedRevenue, CollectedRevenue, OutstandingDebt')
       .eq('BillingMonth', prevMonth)
       .eq('IsActive', 1);
+
+    if (prevCloseErr) {
+      this.logger.error(`Failed to query previous month closings: ${prevCloseErr.message}`);
+      throw new InternalServerErrorException('Failed to query previous month closings');
+    }
 
     (prevClosings || []).forEach(close => {
       prevExpected += close.ExpectedRevenue;
@@ -126,11 +131,16 @@ export class ReportsService {
     });
 
     if ((prevClosings || []).length === 0) {
-      const { data: prevInvoices } = await client
+      const { data: prevInvoices, error: prevInvErr } = await client
         .from('Invoice')
         .select('TotalAmount, PaidAmount, RemainingAmount')
         .eq('BillingMonth', prevMonth)
         .eq('IsActive', 1);
+
+      if (prevInvErr) {
+        this.logger.error(`Failed to query previous month invoices: ${prevInvErr.message}`);
+        throw new InternalServerErrorException('Failed to query previous month invoices');
+      }
 
       (prevInvoices || []).forEach(inv => {
         prevExpected += inv.TotalAmount;
@@ -172,19 +182,58 @@ export class ReportsService {
 
     if (classError) throw new InternalServerErrorException('Failed to fetch classes');
 
+    // Batch fetch active students to count them in-memory
+    const { data: students, error: studentError } = await client
+      .from('User')
+      .select('ClassCode')
+      .eq('Role', 'student')
+      .eq('IsActive', 1);
+
+    if (studentError) throw new InternalServerErrorException('Failed to fetch students for class financials');
+
+    const studentCountMap = new Map<string, number>();
+    for (const student of students || []) {
+      if (student.ClassCode) {
+        studentCountMap.set(student.ClassCode, (studentCountMap.get(student.ClassCode) || 0) + 1);
+      }
+    }
+
+    // Batch fetch monthly closings for target month
+    const { data: closings, error: closingError } = await client
+      .from('MonthlyClosing')
+      .select('*')
+      .eq('BillingMonth', targetMonth)
+      .eq('IsActive', 1);
+
+    if (closingError) throw new InternalServerErrorException('Failed to fetch monthly closings');
+
+    const closingsMap = new Map<string, any>();
+    for (const closing of closings || []) {
+      closingsMap.set(closing.ClassCode, closing);
+    }
+
+    // Batch fetch invoices for target month
+    const { data: invoices, error: invoiceError } = await client
+      .from('Invoice')
+      .select('ClassCode, TotalAmount, PaidAmount, RemainingAmount')
+      .eq('BillingMonth', targetMonth)
+      .eq('IsActive', 1);
+
+    if (invoiceError) throw new InternalServerErrorException('Failed to fetch invoices for class financials');
+
+    const invoicesMap = new Map<string, any[]>();
+    for (const inv of invoices || []) {
+      if (!invoicesMap.has(inv.ClassCode)) {
+        invoicesMap.set(inv.ClassCode, []);
+      }
+      invoicesMap.get(inv.ClassCode).push(inv);
+    }
+
     const financials = [];
 
     for (const cls of classes) {
-      const studentCount = await this.classesService.getStudentCount(cls.Code);
-
-      // Check closed history snapshot
-      const { data: closing } = await client
-        .from('MonthlyClosing')
-        .select('*')
-        .eq('ClassCode', cls.Code)
-        .eq('BillingMonth', targetMonth)
-        .eq('IsActive', 1)
-        .maybeSingle();
+      const studentCount = studentCountMap.get(cls.Code) || 0;
+      const closing = closingsMap.get(cls.Code);
 
       if (closing && closing.Status === 'finalized') {
         financials.push({
@@ -201,19 +250,12 @@ export class ReportsService {
           status: 'closed',
         });
       } else {
-        // Dynamic calculation
-        const { data: invoices } = await client
-          .from('Invoice')
-          .select('TotalAmount, PaidAmount, RemainingAmount')
-          .eq('ClassCode', cls.Code)
-          .eq('BillingMonth', targetMonth)
-          .eq('IsActive', 1);
-
+        const clsInvoices = invoicesMap.get(cls.Code) || [];
         let expected = studentCount * cls.FeeAmount;
         let collected = 0;
         let debt = 0;
 
-        (invoices || []).forEach(inv => {
+        clsInvoices.forEach(inv => {
           collected += inv.PaidAmount;
           debt += inv.RemainingAmount;
         });
@@ -306,26 +348,45 @@ export class ReportsService {
 
     if (error) throw new InternalServerErrorException('Failed to fetch overdue invoices');
 
-    const debtors = [];
+    const studentCodes = Array.from(new Set(invoices.map(inv => inv.StudentCode).filter(Boolean)));
+    const classCodes = Array.from(new Set(invoices.map(inv => inv.ClassCode).filter(Boolean)));
 
-    for (const inv of invoices) {
-      // Get student details
-      const { data: student } = await client
+    let students = [];
+    if (studentCodes.length > 0) {
+      const { data, error: err } = await client
         .from('User')
-        .select('Name, Nickname, Phone')
-        .eq('Code', inv.StudentCode)
-        .eq('IsActive', 1)
-        .maybeSingle();
+        .select('Code, Name, Nickname, Phone')
+        .in('Code', studentCodes)
+        .eq('IsActive', 1);
+      if (err) throw new InternalServerErrorException('Failed to fetch students for debtors');
+      students = data || [];
+    }
 
-      // Get class details
-      const { data: classData } = await client
+    let classes = [];
+    if (classCodes.length > 0) {
+      const { data, error: err } = await client
         .from('Class')
-        .select('Name')
-        .eq('Code', inv.ClassCode)
-        .eq('IsActive', 1)
-        .maybeSingle();
+        .select('Code, Name')
+        .in('Code', classCodes)
+        .eq('IsActive', 1);
+      if (err) throw new InternalServerErrorException('Failed to fetch classes for debtors');
+      classes = data || [];
+    }
 
-      debtors.push({
+    const studentsMap = new Map<string, any>();
+    for (const s of students) {
+      studentsMap.set(s.Code, s);
+    }
+
+    const classesMap = new Map<string, any>();
+    for (const c of classes) {
+      classesMap.set(c.Code, c);
+    }
+
+    const debtors = invoices.map(inv => {
+      const student = studentsMap.get(inv.StudentCode);
+      const classData = classesMap.get(inv.ClassCode);
+      return {
         studentCode: inv.StudentCode,
         studentName: student?.Name || 'Không rõ',
         nickname: student?.Nickname || '',
@@ -337,8 +398,8 @@ export class ReportsService {
         totalAmount: inv.TotalAmount,
         remainingAmount: inv.RemainingAmount,
         dueDate: inv.DueDate,
-      });
-    }
+      };
+    });
 
     return debtors;
   }
@@ -378,15 +439,26 @@ export class ReportsService {
     const collectedRevenue = invoices.reduce((sum: number, inv: any) => sum + (inv.PaidAmount || 0), 0);
     const outstandingDebt = invoices.reduce((sum: number, inv: any) => sum + (inv.RemainingAmount || 0), 0);
 
-    const studentsBreakdown = [];
-    for (const inv of invoices) {
-      const { data: student } = await client
+    const studentCodes = Array.from(new Set(invoices.map((inv: any) => inv.StudentCode).filter(Boolean)));
+    let students = [];
+    if (studentCodes.length > 0) {
+      const { data, error: err } = await client
         .from('User')
-        .select('Name, Nickname')
-        .eq('Code', inv.StudentCode)
-        .maybeSingle();
+        .select('Code, Name, Nickname')
+        .in('Code', studentCodes)
+        .eq('IsActive', 1);
+      if (err) throw new InternalServerErrorException('Failed to fetch students for class report');
+      students = data || [];
+    }
 
-      studentsBreakdown.push({
+    const studentsMap = new Map<string, any>();
+    for (const s of students) {
+      studentsMap.set(s.Code, s);
+    }
+
+    const studentsBreakdown = invoices.map((inv: any) => {
+      const student = studentsMap.get(inv.StudentCode);
+      return {
         studentCode: inv.StudentCode,
         studentName: student?.Name || 'Không rõ',
         nickname: student?.Nickname || '',
@@ -395,8 +467,8 @@ export class ReportsService {
         paidAmount: inv.PaidAmount,
         remainingAmount: inv.RemainingAmount,
         status: inv.Status,
-      });
-    }
+      };
+    });
 
     return {
       classCode,
