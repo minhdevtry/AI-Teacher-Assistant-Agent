@@ -1,7 +1,7 @@
 ﻿<div align="center">
 
 # 🤖 ZaloAgent
-*AI-Powered Tutor Management via Zalo — Vietnamese private tutors*
+*AI-Powered Class Management via Zalo — Vietnamese teacher assistant*
 
 <p align="center">
   <img src="https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white" alt="NestJS"/>
