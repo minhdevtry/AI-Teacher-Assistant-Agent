@@ -11,6 +11,7 @@ import { ClassesModule } from './domain/classes/classes.module';
 import { InvoicesModule } from './domain/invoices/invoices.module';
 import { PaymentsModule } from './domain/payments/payments.module';
 import { MonthlyClosingModule } from './domain/monthly-closing/monthly-closing.module';
+import { ReportsModule } from './domain/reports/reports.module';
 import { SupabaseModule } from './integrations/supabase/supabase.module';
 import { GoogleSheetsModule } from './integrations/google-sheets/google-sheets.module';
 import { AiModule } from './integrations/ai/ai.module';
@@ -32,6 +33,7 @@ import { HealthController } from './core/health/health.controller';
     InvoicesModule,
     PaymentsModule,
     MonthlyClosingModule,
+    ReportsModule,
     SupabaseModule,
     GoogleSheetsModule,
     AiModule,
