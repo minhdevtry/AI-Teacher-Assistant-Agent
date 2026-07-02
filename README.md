@@ -17,7 +17,10 @@
 ---
 
 ## ✨ Tổng Quan
-ZaloAgent là hệ thống backend AI-first cho giáo viên tư thục Việt Nam. Giáo viên nhắn tin tiếng Việt tự nhiên qua Zalo Bot — 2 AI agents tự phân loại ý định, thực thi nghiệp vụ và trả kết quả mà không cần dùng phần mềm phức tạp.
+ZaloAgent là hệ thống backend AI-first cho giáo viên Việt Nam. Giáo viên nhắn tin tiếng Việt qua Zalo Bot - 2 AI agents tự phân loại ý định, thực thi nghiệp vụ và trả kết quả mà không cần dùng phần mềm phức tạp.
+
+## Ý tưởng
+Chị gái tôi dạy thêm ở nhà đang quản lý qua Google Sheet, luôn phải ghi nhớ lịch dạy, phụ huynh cháu nào chuyển tiền, quản lý tiền thừa thiếu, thay đổi giờ dạy, xếp lịch. VÌ vậy Google sheet trở nên phức tạp và cuối tháng cần tổng hợp lại, vừa mất thời gian mỗi khi có việc xảy ra, vừa phải xử lý nghiệp vụ kế toán cơ bản, ai trả tiền mặt, ai chuyển khoản, ai nợ, ai trả trước. Dự án này giúp tiết kiệm thời gian, khi có vấn đề xảy ra chỉ cần chuyển tiếp qua Bot, Agent tự phân loại và chị chỉ cần xác nhận hoặc cuối ngày xem báo cáo ngày rồi duyệt một lần duy nhất, Agent thực hiện ghi nhận theo xác nhận, đồng bộ lên Google Sheet sau khi làm xong. Cuối tháng chốt sổ, tính toán xác nhận công nợ chi tiết và tổng hợp. Dự án này chưa kết hợp hạch toán, chưa phân rõ 111/112 - 131, 511 vì chưa cần xử lý.
 
 ## 🏗️ Tech Stack
 
