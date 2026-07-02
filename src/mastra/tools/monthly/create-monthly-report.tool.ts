@@ -1,81 +1,42 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { ClassesService } from '../../../domain/classes/classes.service';
-import { InvoicesService } from '../../../domain/invoices/invoices.service';
+import { MonthlyClosingService } from '../../../domain/monthly-closing/monthly-closing.service';
 
 export function createCreateMonthlyReportTool(
-  classesService: ClassesService,
-  invoicesService: InvoicesService,
+  monthlyClosingService: MonthlyClosingService,
 ) {
   return createTool({
     id: 'create-monthly-report',
-    description: 'Tạo báo cáo chốt sổ tháng cho một lớp',
+    description: 'Tạo báo cáo chốt sổ tháng cho một lớp dưới dạng nháp và lưu trữ',
     inputSchema: z.object({
       classCode: z.string().describe('Mã lớp'),
       billingMonth: z.string().describe('Tháng báo cáo (VD: 2026-07)'),
     }),
-    outputSchema: z.object({
-      classCode: z.string(),
-      className: z.string(),
-      billingMonth: z.string(),
-      totalStudents: z.number(),
-      expectedRevenue: z.number(),
-      collectedRevenue: z.number(),
-      outstandingDebt: z.number(),
-      collectionRate: z.number(),
-      status: z.string(),
-      reportJson: z.string(),
-    }),
+    outputSchema: z.any(),
     execute: async (input) => {
-      const classData = await classesService.findByCode(input.classCode);
-      const studentCount = await classesService.getStudentCount(input.classCode);
-
-      const result = await invoicesService.findAll({
-        classCode: input.classCode,
-        billingMonth: input.billingMonth,
-        limit: 500,
-      });
-
-      const expectedRevenue = studentCount * classData.FeeAmount;
-      const collectedRevenue = result.data.reduce(
-        (sum: number, inv: { PaidAmount: number }) => sum + (inv.PaidAmount || 0),
-        0,
-      );
-      const outstandingDebt = result.data.reduce(
-        (sum: number, inv: { RemainingAmount: number }) =>
-          sum + (inv.RemainingAmount || 0),
-        0,
+      const draft = await monthlyClosingService.createOrUpdateDraft(
+        input.classCode,
+        input.billingMonth,
       );
 
-      const collectionRate =
-        expectedRevenue > 0
-          ? Math.round((collectedRevenue / expectedRevenue) * 100)
-          : 0;
-
-      const reportJson = JSON.stringify({
-        classCode: input.classCode,
-        className: classData.Name,
-        billingMonth: input.billingMonth,
-        totalStudents: studentCount,
-        expectedRevenue,
-        collectedRevenue,
-        outstandingDebt,
-        collectionRate,
-        generatedAt: new Date().toISOString(),
-      });
+      const collectionRate = draft.ExpectedRevenue > 0
+        ? Math.round((draft.CollectedRevenue / draft.ExpectedRevenue) * 100)
+        : 0;
 
       return {
-        classCode: input.classCode,
-        className: classData.Name,
-        billingMonth: input.billingMonth,
-        totalStudents: studentCount,
-        expectedRevenue,
-        collectedRevenue,
-        outstandingDebt,
+        classCode: draft.ClassCode,
+        className: draft.Name,
+        billingMonth: draft.BillingMonth,
+        totalStudents: draft.TotalStudents,
+        expectedRevenue: draft.ExpectedRevenue,
+        collectedRevenue: draft.CollectedRevenue,
+        outstandingDebt: draft.OutstandingDebt,
         collectionRate,
-        status: collectionRate >= 100 ? 'complete' : 'draft',
-        reportJson,
+        status: draft.Status,
+        reportJson: draft.ReportJson,
+        closingCode: draft.Code,
       };
     },
   });
 }
+

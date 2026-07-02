@@ -13,6 +13,7 @@ import { AuditService } from '../domain/common/audit.service';
 import { ApprovalService } from './approval.service';
 import { SupabaseService } from '../integrations/supabase/supabase.service';
 import { SheetsSyncQueueService } from '../jobs/sheets-sync-queue.service';
+import { MonthlyClosingService } from '../domain/monthly-closing/monthly-closing.service';
 import {
   createRecordPaymentFromTextWorkflow,
   createRecordPaymentFromBillWorkflow,
@@ -63,6 +64,7 @@ export class MastraService implements OnModuleInit {
     private readonly auditService: AuditService,
     private readonly approvalService: ApprovalService,
     private readonly supabaseService: SupabaseService,
+    private readonly monthlyClosingService: MonthlyClosingService,
     @Optional() private readonly sheetsSyncQueueService?: SheetsSyncQueueService,
   ) {}
 
@@ -121,12 +123,10 @@ export class MastraService implements OnModuleInit {
         this.usersService,
       ),
       collectMonthlyData: createCollectMonthlyDataTool(
-        this.invoicesService,
-        this.classesService,
+        this.monthlyClosingService,
       ),
       createMonthlyReport: createCreateMonthlyReportTool(
-        this.classesService,
-        this.invoicesService,
+        this.monthlyClosingService,
       ),
       queueGoogleSheetSync: createQueueGoogleSheetSyncTool(this.sheetsSyncQueueService!),
     };

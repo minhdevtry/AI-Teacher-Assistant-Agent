@@ -12,6 +12,7 @@ import { PaymentsModule } from '../domain/payments/payments.module';
 import { SupabaseModule } from '../integrations/supabase/supabase.module';
 import { JobsModule } from '../jobs/jobs.module';
 import { AuditService } from '../domain/common/audit.service';
+import { MonthlyClosingModule } from '../domain/monthly-closing/monthly-closing.module';
 
 /**
  * Mastra integration module.
@@ -31,6 +32,7 @@ import { AuditService } from '../domain/common/audit.service';
     InvoicesModule,
     PaymentsModule,
     JobsModule,
+    MonthlyClosingModule,
   ],
   controllers: [MastraController],
   providers: [
