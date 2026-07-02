@@ -35,10 +35,14 @@ Thumbs.db
 prisma/migrations/
 generated/prisma/
 
+# Credentials & secrets
+credentials.md
+
 # Misc
 .husky/
 node_modules
 # Keep environment variables out of version control
 .env
+.codex/
 
 /generated/prisma

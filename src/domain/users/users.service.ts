@@ -1,4 +1,4 @@
-import {
+﻿import {
   Injectable,
   NotFoundException,
   InternalServerErrorException,
@@ -89,12 +89,14 @@ export class UsersService {
 
   async search(query: string) {
     const client = this.supabaseService.getClient();
+    // Escape LIKE special characters (% _ \) to prevent injection
+    const safe = query.replace(/[%_\\]/g, (c) => (c === '%' || c === '_' ? "\\" + c : "\\\\" + c));
     const { data, error } = await client
       .from('User')
       .select('*')
       .eq('IsActive', 1)
       .or(
-        `Name.ilike.%${query}%,Nickname.ilike.%${query}%,Phone.ilike.%${query}%`,
+        `Name.ilike.%${safe}%,Nickname.ilike.%${safe}%,Phone.ilike.%${safe}%`,
       )
       .order('Id', { ascending: false });
 

@@ -225,30 +225,34 @@ export class InvoicesService {
     if (!classData) throw new NotFoundException(`Class ${classCode} not found`);
 
     const feeAmount = classData.FeeAmount;
+
+    // Batch: fetch all existing invoices for this class/month in one query
+    const { data: existingInvoices } = await client
+      .from('Invoice')
+      .select('StudentCode')
+      .eq('ClassCode', classCode)
+      .eq('BillingMonth', billingMonth)
+      .eq('IsActive', 1);
+
+    const existingCodes = new Set((existingInvoices ?? []).map((inv) => inv.StudentCode));
+
+    // Batch: get current max code for INV prefix (single query)
+    const { data: maxRow } = await client
+      .from('Invoice')
+      .select('Code')
+      .like('Code', 'INV%')
+      .order('Id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let nextNumber = maxRow ? parseInt(maxRow.Code.replace('INV', ''), 10) + 1 : 1;
+
     const invoices: unknown[] = [];
 
     for (const student of students) {
-      // Check if invoice already exists for this student/month
-      const { data: existing } = await client
-        .from('Invoice')
-        .select('Code')
-        .eq('StudentCode', student.Code)
-        .eq('ClassCode', classCode)
-        .eq('BillingMonth', billingMonth)
-        .eq('IsActive', 1)
-        .maybeSingle();
+      if (existingCodes.has(student.Code)) continue; // Skip existing invoices
 
-      if (existing) continue; // Skip existing invoices
-
-      const { data: maxRow } = await client
-        .from('Invoice')
-        .select('Code')
-        .like('Code', 'INV%')
-        .order('Id', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const code = CodeGenerator.generate('INV', maxRow?.Code ?? null);
+      const code = `INV${String(nextNumber++).padStart(6, '0')}`;
 
       const { data: invoice, error } = await client
         .from('Invoice')

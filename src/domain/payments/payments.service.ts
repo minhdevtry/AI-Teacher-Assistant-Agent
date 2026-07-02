@@ -315,7 +315,14 @@ export class PaymentsService {
       .eq('IsActive', 1)
       .maybeSingle();
 
-    if (invoiceError || !invoice) return;
+    if (invoiceError) {
+      this.logger.error(`updateInvoiceBalance: failed to fetch invoice ${invoiceCode}: ${invoiceError.message}`);
+      throw new InternalServerErrorException(`Failed to fetch invoice ${invoiceCode}`);
+    }
+    if (!invoice) {
+      this.logger.error(`updateInvoiceBalance: invoice ${invoiceCode} not found`);
+      throw new NotFoundException(`Invoice ${invoiceCode} not found`);
+    }
 
     // Sum confirmed payments
     const { data: payments, error: payError } = await client
@@ -325,7 +332,10 @@ export class PaymentsService {
       .eq('Status', 'confirmed')
       .eq('IsActive', 1);
 
-    if (payError) return;
+    if (payError) {
+      this.logger.error(`updateInvoiceBalance: failed to fetch payments for ${invoiceCode}: ${payError.message}`);
+      throw new InternalServerErrorException(`Failed to fetch payments for invoice ${invoiceCode}`);
+    }
 
     const paidAmount = (payments ?? []).reduce((sum, p) => sum + p.Amount, 0);
     const remainingAmount = invoice.TotalAmount - paidAmount;

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../integrations/supabase/supabase.service';
 import { CodeGenerator } from './code-generator';
 
@@ -15,6 +15,8 @@ export interface AuditLogEntry {
 
 @Injectable()
 export class AuditService {
+  private readonly logger = new Logger(AuditService.name);
+
   constructor(private readonly supabaseService: SupabaseService) {}
 
   async log(entry: AuditLogEntry): Promise<void> {
@@ -30,11 +32,18 @@ export class AuditService {
 
     const code = CodeGenerator.generate('AUD', maxRow?.Code ?? null);
 
-    await client.from('AuditLog').insert({
-      Name: `${entry.Action} ${entry.EntityType} ${entry.EntityCode}`,
-      Code: code,
-      Description: `Audit log for ${entry.Action} on ${entry.EntityType}`,
-      ...entry,
-    });
+    try {
+      await client.from('AuditLog').insert({
+        Name: `${entry.Action} ${entry.EntityType} ${entry.EntityCode}`,
+        Code: code,
+        Description: `Audit log for ${entry.Action} on ${entry.EntityType}`,
+        ...entry,
+      });
+    } catch (err) {
+      // Audit failure must not block business operations
+      this.logger.warn(
+        `Audit log failed for ${entry.EntityType}:${entry.EntityCode} (${entry.Action}): ${err}`
+      );
+    }
   }
 }
