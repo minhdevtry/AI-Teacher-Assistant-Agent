@@ -9,7 +9,7 @@ export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
   @Get('dashboard-summary')
-  @ApiOperation({ summary: 'Lấy báo cáo tổng hợp kết quả (KPI KPI)' })
+  @ApiOperation({ summary: 'Lấy báo cáo tổng hợp kết quả (KPI)' })
   @ApiQuery({ name: 'month', required: false, description: 'Tháng báo cáo (Format: YYYY-MM)' })
   async getDashboardSummary(@Query('month') month?: string) {
     const data = await this.reportsService.getDashboardSummary(month);

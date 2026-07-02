@@ -289,13 +289,14 @@ export class ReportsService {
         });
       } else {
         const clsInvoices = invoicesMap.get(cls.Code) || [];
-        let expected = studentCount * cls.FeeAmount;
+        let expected = 0;
         let collected = 0;
         let debt = 0;
 
         clsInvoices.forEach(inv => {
-          collected += inv.PaidAmount;
-          debt += inv.RemainingAmount;
+          expected += inv.TotalAmount || 0;
+          collected += inv.PaidAmount || 0;
+          debt += inv.RemainingAmount || 0;
         });
 
         financials.push({

@@ -220,10 +220,10 @@ describe('ReportsService', () => {
         className: 'English Class',
         subject: 'English',
         totalStudents: 2,
-        expectedRevenue: 800000,
+        expectedRevenue: 400000,
         collectedRevenue: 200000,
         outstandingDebt: 200000,
-        collectionRate: 25,
+        collectionRate: 50,
         status: 'unclosed',
       });
     });
