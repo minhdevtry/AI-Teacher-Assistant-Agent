@@ -236,7 +236,12 @@ describe('ReportsService', () => {
       mockClient.from.mockImplementation((table: string) => {
         if (table === 'MonthlyClosing') {
           return new MockBuilder([
-            { ExpectedRevenue: 1000, CollectedRevenue: 800 }
+            { BillingMonth: '2026-06', ExpectedRevenue: 1000, CollectedRevenue: 800 }
+          ]);
+        }
+        if (table === 'Invoice') {
+          return new MockBuilder([
+            { BillingMonth: '2026-07', TotalAmount: 500, PaidAmount: 300 }
           ]);
         }
         return new MockBuilder();
@@ -245,7 +250,12 @@ describe('ReportsService', () => {
       const trends = await service.getRevenueTrends(3);
       expect(trends).toHaveLength(3);
       expect(trends[0].billingMonth).toBe('2026-05');
+      expect(trends[1].billingMonth).toBe('2026-06');
+      expect(trends[1].expectedRevenue).toBe(1000);
+      expect(trends[1].collectedRevenue).toBe(800);
       expect(trends[2].billingMonth).toBe('2026-07');
+      expect(trends[2].expectedRevenue).toBe(500);
+      expect(trends[2].collectedRevenue).toBe(300);
     });
   });
 

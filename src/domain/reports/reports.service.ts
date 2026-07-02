@@ -45,7 +45,10 @@ export class ReportsService {
       .eq('Role', 'student')
       .eq('IsActive', 1);
 
-    if (studentErr) throw new InternalServerErrorException('Failed to count students');
+    if (studentErr) {
+      this.logger.error(`Failed to count students: ${studentErr.message}`);
+      throw new InternalServerErrorException('Failed to count students');
+    }
 
     // 2. Compute financial summary for target month
     let expectedRevenue = 0;
@@ -61,7 +64,10 @@ export class ReportsService {
         .eq('BillingMonth', activeMonth)
         .eq('IsActive', 1);
 
-      if (invError) throw new InternalServerErrorException('Failed to calculate current month invoices');
+      if (invError) {
+        this.logger.error(`Failed to calculate current month invoices: ${invError.message}`);
+        throw new InternalServerErrorException('Failed to calculate current month invoices');
+      }
 
       (invoices || []).forEach(inv => {
         expectedRevenue += inv.TotalAmount;
@@ -77,7 +83,10 @@ export class ReportsService {
         .eq('Status', 'finalized')
         .eq('IsActive', 1);
 
-      if (closeError) throw new InternalServerErrorException('Failed to query historical monthly closing');
+      if (closeError) {
+        this.logger.error(`Failed to query historical monthly closing: ${closeError.message}`);
+        throw new InternalServerErrorException('Failed to query historical monthly closing');
+      }
 
       (closings || []).forEach(close => {
         expectedRevenue += close.ExpectedRevenue;
@@ -180,7 +189,10 @@ export class ReportsService {
       .select('*')
       .eq('IsActive', 1);
 
-    if (classError) throw new InternalServerErrorException('Failed to fetch classes');
+    if (classError) {
+      this.logger.error(`Failed to fetch classes: ${classError.message}`);
+      throw new InternalServerErrorException('Failed to fetch classes');
+    }
 
     // Batch fetch active students to count them in-memory
     const { data: students, error: studentError } = await client
@@ -189,7 +201,10 @@ export class ReportsService {
       .eq('Role', 'student')
       .eq('IsActive', 1);
 
-    if (studentError) throw new InternalServerErrorException('Failed to fetch students for class financials');
+    if (studentError) {
+      this.logger.error(`Failed to fetch students for class financials: ${studentError.message}`);
+      throw new InternalServerErrorException('Failed to fetch students for class financials');
+    }
 
     const studentCountMap = new Map<string, number>();
     for (const student of students || []) {
@@ -205,7 +220,10 @@ export class ReportsService {
       .eq('BillingMonth', targetMonth)
       .eq('IsActive', 1);
 
-    if (closingError) throw new InternalServerErrorException('Failed to fetch monthly closings');
+    if (closingError) {
+      this.logger.error(`Failed to fetch monthly closings: ${closingError.message}`);
+      throw new InternalServerErrorException('Failed to fetch monthly closings');
+    }
 
     const closingsMap = new Map<string, any>();
     for (const closing of closings || []) {
@@ -219,7 +237,10 @@ export class ReportsService {
       .eq('BillingMonth', targetMonth)
       .eq('IsActive', 1);
 
-    if (invoiceError) throw new InternalServerErrorException('Failed to fetch invoices for class financials');
+    if (invoiceError) {
+      this.logger.error(`Failed to fetch invoices for class financials: ${invoiceError.message}`);
+      throw new InternalServerErrorException('Failed to fetch invoices for class financials');
+    }
 
     const invoicesMap = new Map<string, any[]>();
     for (const inv of invoices || []) {
@@ -283,7 +304,7 @@ export class ReportsService {
     const trends = [];
 
     // Generate list of billing months
-    const months = [];
+    const months: string[] = [];
     const [currYear, currMonth] = current.split('-').map(Number);
 
     for (let i = limit - 1; i >= 0; i--) {
@@ -293,34 +314,63 @@ export class ReportsService {
       months.push(`${y}-${m}`);
     }
 
+    // Query all finalized monthly closings for the requested months in a single query
+    const { data: closings, error: closingError } = await client
+      .from('MonthlyClosing')
+      .select('BillingMonth, ExpectedRevenue, CollectedRevenue')
+      .in('BillingMonth', months)
+      .eq('Status', 'finalized')
+      .eq('IsActive', 1);
+
+    if (closingError) {
+      this.logger.error(`Failed to fetch monthly closings for revenue trends: ${closingError.message}`);
+      throw new InternalServerErrorException('Failed to fetch monthly closings for revenue trends');
+    }
+
+    // Query all active invoices for the requested months in a single query
+    const { data: invoices, error: invoiceError } = await client
+      .from('Invoice')
+      .select('BillingMonth, TotalAmount, PaidAmount')
+      .in('BillingMonth', months)
+      .eq('IsActive', 1);
+
+    if (invoiceError) {
+      this.logger.error(`Failed to fetch invoices for revenue trends: ${invoiceError.message}`);
+      throw new InternalServerErrorException('Failed to fetch invoices for revenue trends');
+    }
+
+    // Aggregate in memory
+    const closingMap = new Map<string, { expected: number; collected: number }[]>();
+    (closings || []).forEach(c => {
+      if (!closingMap.has(c.BillingMonth)) {
+        closingMap.set(c.BillingMonth, []);
+      }
+      closingMap.get(c.BillingMonth)!.push({ expected: c.ExpectedRevenue, collected: c.CollectedRevenue });
+    });
+
+    const invoiceMap = new Map<string, { expected: number; collected: number }[]>();
+    (invoices || []).forEach(inv => {
+      if (!invoiceMap.has(inv.BillingMonth)) {
+        invoiceMap.set(inv.BillingMonth, []);
+      }
+      invoiceMap.get(inv.BillingMonth)!.push({ expected: inv.TotalAmount, collected: inv.PaidAmount });
+    });
+
     for (const m of months) {
       let expected = 0;
       let collected = 0;
 
-      // Try getting from closed summaries
-      const { data: closings } = await client
-        .from('MonthlyClosing')
-        .select('ExpectedRevenue, CollectedRevenue')
-        .eq('BillingMonth', m)
-        .eq('Status', 'finalized')
-        .eq('IsActive', 1);
-
-      if (closings && closings.length > 0) {
-        closings.forEach(c => {
-          expected += c.ExpectedRevenue;
-          collected += c.CollectedRevenue;
+      const monthClosings = closingMap.get(m);
+      if (monthClosings && monthClosings.length > 0) {
+        monthClosings.forEach(c => {
+          expected += c.expected;
+          collected += c.collected;
         });
       } else {
-        // Fallback to live invoices
-        const { data: invoices } = await client
-          .from('Invoice')
-          .select('TotalAmount, PaidAmount')
-          .eq('BillingMonth', m)
-          .eq('IsActive', 1);
-
-        (invoices || []).forEach(inv => {
-          expected += inv.TotalAmount;
-          collected += inv.PaidAmount;
+        const monthInvoices = invoiceMap.get(m);
+        (monthInvoices || []).forEach(inv => {
+          expected += inv.expected;
+          collected += inv.collected;
         });
       }
 
@@ -346,7 +396,10 @@ export class ReportsService {
       .in('Status', ['unpaid', 'partial'])
       .order('RemainingAmount', { ascending: false });
 
-    if (error) throw new InternalServerErrorException('Failed to fetch overdue invoices');
+    if (error) {
+      this.logger.error(`Failed to fetch overdue invoices: ${error.message}`);
+      throw new InternalServerErrorException('Failed to fetch overdue invoices');
+    }
 
     const studentCodes = Array.from(new Set(invoices.map(inv => inv.StudentCode).filter(Boolean)));
     const classCodes = Array.from(new Set(invoices.map(inv => inv.ClassCode).filter(Boolean)));
@@ -358,7 +411,10 @@ export class ReportsService {
         .select('Code, Name, Nickname, Phone')
         .in('Code', studentCodes)
         .eq('IsActive', 1);
-      if (err) throw new InternalServerErrorException('Failed to fetch students for debtors');
+      if (err) {
+        this.logger.error(`Failed to fetch students for debtors: ${err.message}`);
+        throw new InternalServerErrorException('Failed to fetch students for debtors');
+      }
       students = data || [];
     }
 
@@ -369,7 +425,10 @@ export class ReportsService {
         .select('Code, Name')
         .in('Code', classCodes)
         .eq('IsActive', 1);
-      if (err) throw new InternalServerErrorException('Failed to fetch classes for debtors');
+      if (err) {
+        this.logger.error(`Failed to fetch classes for debtors: ${err.message}`);
+        throw new InternalServerErrorException('Failed to fetch classes for debtors');
+      }
       classes = data || [];
     }
 
@@ -411,13 +470,18 @@ export class ReportsService {
     const studentCount = await this.classesService.getStudentCount(classCode);
 
     // Check if closing history exists
-    const { data: closing } = await client
+    const { data: closing, error: closingErr } = await client
       .from('MonthlyClosing')
       .select('ReportJson, Status')
       .eq('ClassCode', classCode)
       .eq('BillingMonth', month)
       .eq('IsActive', 1)
       .maybeSingle();
+
+    if (closingErr) {
+      this.logger.error(`Failed to fetch monthly closing for class report: ${closingErr.message}`);
+      throw new InternalServerErrorException('Failed to fetch monthly closing for class report');
+    }
 
     if (closing && closing.Status === 'finalized' && closing.ReportJson) {
       const report = JSON.parse(closing.ReportJson);
@@ -447,7 +511,10 @@ export class ReportsService {
         .select('Code, Name, Nickname')
         .in('Code', studentCodes)
         .eq('IsActive', 1);
-      if (err) throw new InternalServerErrorException('Failed to fetch students for class report');
+      if (err) {
+        this.logger.error(`Failed to fetch students for class report: ${err.message}`);
+        throw new InternalServerErrorException('Failed to fetch students for class report');
+      }
       students = data || [];
     }
 
