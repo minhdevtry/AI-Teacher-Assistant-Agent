@@ -10,6 +10,7 @@ import { UsersModule } from './domain/users/users.module';
 import { ClassesModule } from './domain/classes/classes.module';
 import { InvoicesModule } from './domain/invoices/invoices.module';
 import { PaymentsModule } from './domain/payments/payments.module';
+import { MonthlyClosingModule } from './domain/monthly-closing/monthly-closing.module';
 import { SupabaseModule } from './integrations/supabase/supabase.module';
 import { GoogleSheetsModule } from './integrations/google-sheets/google-sheets.module';
 import { AiModule } from './integrations/ai/ai.module';
@@ -30,6 +31,7 @@ import { HealthController } from './core/health/health.controller';
     ClassesModule,
     InvoicesModule,
     PaymentsModule,
+    MonthlyClosingModule,
     SupabaseModule,
     GoogleSheetsModule,
     AiModule,
