@@ -247,7 +247,7 @@ export class ReportsService {
       if (!invoicesMap.has(inv.ClassCode)) {
         invoicesMap.set(inv.ClassCode, []);
       }
-      invoicesMap.get(inv.ClassCode).push(inv);
+      invoicesMap.get(inv.ClassCode)!.push(inv);
     }
 
     const financials = [];
@@ -404,7 +404,7 @@ export class ReportsService {
     const studentCodes = Array.from(new Set(invoices.map(inv => inv.StudentCode).filter(Boolean)));
     const classCodes = Array.from(new Set(invoices.map(inv => inv.ClassCode).filter(Boolean)));
 
-    let students = [];
+    let students: any[] = [];
     if (studentCodes.length > 0) {
       const { data, error: err } = await client
         .from('User')
@@ -418,7 +418,7 @@ export class ReportsService {
       students = data || [];
     }
 
-    let classes = [];
+    let classes: any[] = [];
     if (classCodes.length > 0) {
       const { data, error: err } = await client
         .from('Class')
@@ -504,7 +504,7 @@ export class ReportsService {
     const outstandingDebt = invoices.reduce((sum: number, inv: any) => sum + (inv.RemainingAmount || 0), 0);
 
     const studentCodes = Array.from(new Set(invoices.map((inv: any) => inv.StudentCode).filter(Boolean)));
-    let students = [];
+    let students: any[] = [];
     if (studentCodes.length > 0) {
       const { data, error: err } = await client
         .from('User')
